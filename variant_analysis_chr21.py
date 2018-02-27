@@ -1,7 +1,8 @@
 #Combined HW1 and HW2
 #Author: Rhondene J Wint
 """  Read a chr21.vcf from the 1000genomes dataset to record the number of bi-allelic variants per population, number of
-segregating sites for a population and the number of global singletons per population"""
+segregating sites for a population and the number of global singletons per population. 
+This script is written to run on cluster command-line since chr21.vcf file is 11GB  """
 
 import pandas as pd
 import os
@@ -31,22 +32,30 @@ pop_dict['seg_sites'] = {k:0 for (k,v) in pop_dict.items()}  #count number of se
 pop_dict['site_tracker'] = {k:0 for (k,v) in pop_dict.items()} #tracks if the current chromosome position was already recorded as a singleton for that population
 pop_dict['singleton'] = {k:0 for (k,v) in pop_dict.items()} # count the number of global singletons that belong to a population 
 
-#search for population of a individual
+""" Segregating sites are positions which show differences (polymorphisms) between related genes in a sequence alignment 
+That is any sites where at least one individual is a variant.
+     E.g. if of the 500 variants are found to belong to ACB population, then ACB is only updated by +1 for that chromosome position.
+if pop_dict['site_tracker'][pop]==0 then no seg site has been updated for that population as yet
+if pop_dict['site_tracker'][pop]==1 then that chr position has already been recorded as a segregating site"""
+
+
+#search for population of an individual
 def reverse_lookup(dic, value):
     for key in dic:
         if value in dic[key].values:
             return key
 
 #read vcf line by line and record segregating sites per population
-n=252  # header lines to skip; n = gunzip -c chr21.vcf.gz | grep -c '##' or n =os.open("gunzip -c chr21.vcf.gz | grep -c '##').readline()
+n=252  # header lines to skip; 
+# On command-line use gunzip -c chr21.vcf.gz | grep -c '##' or also in python: n =os.open("gunzip -c chr21.vcf.gz | grep -c '##').readline()
 
 with open(sys.argv[2], 'r+') as fh:
     i =0;
     for line in fh:
         i+=1
-        if (i == n):  
+        if (i == n):  #this is the line that stores all column headings with IDs of sequenced individuals
             col_ID = fh.readline().split('\t') 
-            col_ID = col_ID[9:]
+            col_ID = col_ID[9:]   #only want columns  with IDs of individuals
         if i > n:
             row = fh.readline().split('\t')
             try:  #i got an index error for some reason when I ran the whole vcf file, but did not appear on subset of data
@@ -56,7 +65,7 @@ with open(sys.argv[2], 'r+') as fh:
                 #reset trackers to zero before new row  
                     pop_dict['site_tracker'] = {k:0 for (k,v) in pop_dict['site_tracker'].items()} 
                     single_list=[]
-                    for x in range(len(row)):  #could also do for col in row
+                    for x in range(len(row)):  
                         if (row[x]=='0|1' or row[x]=='1|0' or row[x]=='1|1'):
                             ind_dict[col_ID[x]] +=1
                         
@@ -76,7 +85,7 @@ with open(sys.argv[2], 'r+') as fh:
                                   
             except IndexError:   #restart loop
                 continue                         
-        if (i == 2000): break;     
+       # if (i == 2000): break; for testing if code works on subset of data     
    
 #could've converted the dicts directily to csv but want to avoid indexing issues
 seg_sites = pd.DataFrame(list(pop_dict['seg_sites'].items()), columns=['Population', 'Seg_Sites'])
@@ -89,7 +98,7 @@ var_sites.sort_values(var_sites.columns[0], inplace=True)
 geotable.sort_values(geotable.columns[0], inplace=True)
 var_sites['Population'] = geotable['pop']
 
-#store as csv file for later visualisation
+#Cluster outputs csv file to access later for visualisation in Jupyter notebook
 
 seg_sites.to_csv('seg_sites.csv', sep=',', index=False)
 singletons.to_csv('singletons.csv', sep=',', index =False)
